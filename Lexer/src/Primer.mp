@@ -1,6 +1,6 @@
 main()
 {
- int a; boolean b; real c;
+ int a; boolean b; real a;
  a:=157;
  b:=true;
  c:=5.987;
