@@ -1,0 +1,354 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.ArrayList;
+import SymbolTable.*;
+
+parser code {:
+	public int errNo = 0;
+	public int warnNo = 0;
+	public int scope = 0;
+	SymbolTable symbolTable;
+   public static void main( String[] args )
+   {
+      try
+	  {
+		   FileReader file = new FileReader(args[0]);
+		   java_cup.runtime.Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+		   parser.checkWarnings();
+		   if ( parser.errNo==0 && parser.warnNo==0 )
+		   System.out.println( "Analiza zavrsena. U kodu nema gresaka." );
+		   else System.out.println( "Analiza zavrsena. Broj gresaka: " + parser.errNo + " Broj upozorenja: " + parser.warnNo );
+	  }
+	  catch( Exception e )
+	  {
+		   e.printStackTrace();
+	  }
+   }
+   public void checkWarnings()
+   {
+      SymbolNode current = symbolTable.getVariables();
+      while ( current != null )
+      {
+      	Variable var = ( Variable ) current;
+      	if ( var.last_def == -1 && var.last_use == -1 )
+      	{
+      		System.out.println( "Upozorenje: Promenljiva " + var.name + 
+      			" je deklarisana, ali se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	else if ( var.last_def > var.last_use )
+      	{
+      		System.out.println( "Upozorenje: Vrednost dodeljena promeljivoj " +
+      		    var.name + " u liniji " + var.last_def + " se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	current = current.next;
+     }
+   }
+   public void syntax_error(Symbol cur_token)
+   {
+   	  
+   }
+   public void report_error(String message, Object info)
+   {
+   	   System.out.print( message );
+   }
+   public int getLine()
+   {
+   	  return (( MPLexer) getScanner()).getLine();
+   }
+:};
+
+init with {:
+	symbolTable = new SymbolTable();
+:}
+
+//Terminali
+terminal MAIN, INT, BOOLEAN, REAL, IF, ELIF, ELSE;
+terminal LEFTBLOCK, RIGHTBLOCK, LEFTPAR, RIGHTPAR, LESSTHAN, LESSOREQUAL, GREATERTHAN, GREATEROREQUAL, EQUAL, NOTEQUAL, SEMICOLON, COLON, ASSIGN;
+terminal String ID;
+terminal Integer INTCONST;
+terminal Double REALCONST;
+terminal Boolean BOOLEANCONST;
+
+//Neterminali
+non terminal Program,Block, Block1, Block2, Statements,Variables, Variable, Statement, IfStatement, ElsePart;
+non terminal ElifList, Elif, ElseStatement, RelOp, Assignment;
+non terminal Constant  Konstanta;
+non terminal Type Typ,Term,RelExpression;
+  
+start with Program;
+//Gramatika
+Program ::= MAIN LEFTPAR RIGHTPAR Block
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :};
+
+Block::= Block1 Block2
+				{:
+				:};
+Block1 ::= LEFTBLOCK Variables Statements 
+             {:
+                System.out.println( "Redukcija po smeni 2." );
+				parser.scope++;
+             :};
+Block2::= RIGHTBLOCK
+				{:
+					parser.scope--;
+				:};
+Variables ::= Variables Variable
+            {:
+               System.out.println( "Redukcija po smeni 3." );
+            :}
+          | Variable
+            {:
+                System.out.println( "Redukcija po smeni 4." );
+            :}
+          ;
+
+Variable ::= Typ:tip ID:ime SEMICOLON
+                {:
+					  if ( ! parser.symbolTable.addVar( ime, tip, parser.scope ) )
+					   {
+					   	 System.out.println( "Greska u liniji " + parser.getLine() + ": " + 
+                   			"Promenljiva " + ime + " je vec deklarisana." );
+            		     parser.errNo++;
+					   }
+                    System.out.println( "Redukcija po smeni 5." );
+                :};
+
+Typ ::= INT 
+             {:
+				RESULT = parser.symbolTable.getType( "int" );
+                System.out.println( "Redukcija po smeni 6." );
+             :} 
+           | REAL
+             {:
+				RESULT = parser.symbolTable.getType( "real" );
+                System.out.println( "Redukcija po smeni 7." );
+             :}
+           | BOOLEAN
+             {:
+				RESULT = parser.symbolTable.getType( "boolean" );
+                System.out.println( "Redukcija po smeni 8." );
+             :}
+           ;
+
+Statements ::= Statements SEMICOLON Statement 
+        {:
+           System.out.println( "Redukcija po smeni 9." );
+        :}
+      | Statement
+        {:
+           System.out.println( "Redukcija po smeni 10." );
+        :}
+      ;
+
+Statement ::= Assignment
+         {:
+            System.out.println( "Redukcija po smeni 11." );
+         :}
+         | IfStatement
+        {:
+           System.out.println( "Redukcija po smeni 12." );
+        :}
+         ;
+
+IfStatement ::= IF LEFTPAR RelExpression:re RIGHTPAR COLON Block ElsePart
+           {:
+			  if(re.name != "boolean")
+				{
+					System.out.println("Greska u liniji " +parser.getLine() + ": " +"Izraz mora biti tipa boolean a trenutni izraz je tipa: " + re.name);
+					parser.errNo++;
+				}
+			  RESULT = parser.symbolTable.getType("boolean");
+              System.out.println( "Redukcija po smeni 13." );
+           :};
+
+ElsePart ::= ElifList ElseStatement
+            {:
+               System.out.println( "Redukcija po smeni 14." );
+            :}
+          | ElifList 
+            {:
+               System.out.println( "Redukcija po smeni 15." );
+            :}
+          | ElseStatement
+            {:
+               System.out.println( "Redukcija po smeni 16." );
+            :}
+          | 
+            {:
+               System.out.println( "Redukcija po smeni E." );
+            :}
+          ;
+
+ElifList ::= ElifList Elif
+         {:
+            System.out.println( "Redukcija po smeni 17." );
+         :}
+         | Elif
+            {:
+               System.out.println( "Redukcija po smeni 18." );
+            :}
+          ;
+
+Elif ::= ELIF LEFTPAR RelExpression:re RIGHTPAR COLON Block
+          {:
+			 if(re.name != "boolean")
+				{
+					System.out.println("Greska u liniji " +parser.getLine() + ": " +"Izraz mora biti tipa boolean a trenutni izraz je tipa: " + re.name);
+					parser.errNo++;
+				}
+			 RESULT = parser.symbolTable.getType("boolean");
+             System.out.println( "Redukcija po smeni 19." );
+          :};
+
+ElseStatement ::= ELSE COLON Block 
+           {:
+              System.out.println( "Redukcija po smeni 20." );
+           :};
+
+RelExpression ::= Term:i1 RelOp Term:i2 
+          {:
+			 /*if ( i1.tkind != Type.INTEGER || i2.tkind != Type.INTEGER ||  i1.tkind != Type.DOUBLE || i2.tkind != Type.DOUBLE)
+              {
+              	System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+              	   "Relacioni operatori se ne moze primeniti nad operandima tipa " + 
+              	   i1.name + " i " + i2.name );
+              	parser.errNo++;
+              }*/
+			  Type u = parser.symbolTable.getType("unknown" );
+		      if ( i1 == u || i2== u )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		": Promenljiva nije deklarisana. Pogresan uslov.");
+		      	parser.errNo++;
+				RESULT = parser.symbolTable.getType( "unknown");
+		      }
+			  else
+			  {
+			 		if(i1.tkind == Type.BOOLEAN || i2.tkind == Type.BOOLEAN)
+					{
+						System.out.println("Greska u liniji "+parser.getLine()+": "+"Operandi mogu biti samo numerickog tipa");
+						parser.errNo++;
+					}
+				}
+              RESULT = parser.symbolTable.getType( "boolean" );
+             System.out.println( "Redukcija po smeni 21." );
+          :}
+        | Term:tip
+          {:
+		      if ( tip.tkind != Type.BOOLEAN )
+              {
+              	System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+              	   "U zagradama moze stojati samo boolean promenljiva " + 
+              	   tip.name );
+              	parser.errNo++;
+              }
+              RESULT = parser.symbolTable.getType( "boolean" );
+              System.out.println( "Redukcija po smeni 22." );
+          :}
+        ;
+
+Term ::= ID:ime
+           {:
+              Variable var = parser.symbolTable.getVar( ime ,parser.scope);
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+				RESULT = parser.symbolTable.getType( "unknown");
+		      }
+		      else
+			  {
+				RESULT = var.type;
+		      	if ( var.last_def == -1 )
+		      	{
+		      		System.out.println( "Greska u liniji " + parser.getLine() + 
+		      			": promenljiva " + ime + " nije inicijalizovana.");
+		      		parser.errNo++;
+		      	}
+				 var.last_use= parser.getLine();
+			    }
+              System.out.println( "Redukcija po smeni 23." );
+           :}
+         | Konstanta : k
+           {:
+              RESULT = k.type;
+           :}
+         ;
+Konstanta ::= INTCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "int" ), c );
+              :}
+            | REALCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "real" ), c );
+              :}
+            | BOOLEANCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "boolean" ), c );
+              :}
+            ;
+RelOp ::= LESSTHAN
+           {:
+              System.out.println( "Redukcija po smeni 25." );
+           :}
+         | LESSOREQUAL
+           {:
+              System.out.println( "Redukcija po smeni 26." );
+           :}
+         | GREATERTHAN
+           {:
+              System.out.println( "Redukcija po smeni 27." );
+           :}
+         | GREATEROREQUAL
+           {:
+              System.out.println( "Redukcija po smeni 28." );
+           :}
+         | EQUAL
+           {:
+              System.out.println( "Redukcija po smeni 29." );
+           :}
+         | NOTEQUAL
+           {:
+              System.out.println( "Redukcija po smeni 30." );
+           :}
+         ;
+
+Assignment ::= ID:ime ASSIGN Term:tip
+          {:
+			  Variable var = parser.symbolTable.getVar( ime, parser.scope );
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+				RESULT = parser.symbolTable.getType( "unknown" );
+		      }
+		      else
+				 {
+		         var.last_def = parser.getLine();
+		         if ( var.type.tkind != tip.tkind)
+		         {
+		            System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		   ": Neslaganje tipa u naredbi dodele."+ ime );
+		      	    parser.errNo++;
+		         }
+				 else if(tip.tkind == Type.INTEGER && var.type.tkind== Type.DOUBLE)
+					{
+						System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		   ": Izvrsena konverzija nizeg tipa u visi."+ ime );
+					}
+		         }
+             System.out.println( "Redukcija po smeni 31." );
+          :};
+
+	
+
