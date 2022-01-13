@@ -1,0 +1,14 @@
+package AST;
+
+
+public class EqualRelExp extends RealExpression {
+	
+    public EqualRelExp(Term left, Term right){
+        super(right);
+        this.right = right;
+    }
+
+	protected String relOp(){
+        return "Compare_equal";
+    }	
+}

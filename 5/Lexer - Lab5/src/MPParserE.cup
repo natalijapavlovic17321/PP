@@ -1,0 +1,385 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+   public int errNo = 0;
+
+   public static void main( String[] args )
+   {
+      try
+	  {
+		   FileReader file = new FileReader( args[0] );
+		   Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+   		   if ( parser.errNo == 0 )
+		      System.out.println( "Analiza zavrsena. U kodu nema gresaka." );
+		   else
+		      System.out.println( "Analiza zavrsena. Broj gresaka: " + parser.errNo );
+	  
+	  }
+	  catch( Exception e )
+	  {
+		   e.printStackTrace();
+	  }
+   }
+
+   public void syntax_error(Symbol cur_token)
+   {
+   	  
+   }
+   
+   public void report_error(String message, Object info)
+   {
+   	   System.out.print( message );
+   }
+   
+   public int getLine()
+   {
+   	  return (( MPLexer) getScanner()).getLine();
+   }
+:};
+
+
+//Terminali
+terminal MAIN, INT, BOOLEAN, REAL, IF, ELIF, ELSE;
+terminal ID, CONST, LEFTBLOCK, RIGHTBLOCK, LEFTPAR, RIGHTPAR, LESSTHAN, LESSOREQUAL, GREATERTHAN, GREATEROREQUAL, EQUAL, NOTEQUAL, SEMICOLON, COLON, ASSIGN;
+
+//Neterminali
+non terminal Program, Block, Variables, Variable, Type, Statements, Statement, IfStatement, ElsePart;
+non terminal ElifList, Elif, ElseStatement, RelExpression, Term, RelOp, Assignment;
+
+//Precedences added by Eclipse plugin
+precedence nonassoc error;	// Inserted by Eclipse plugin
+
+start with Program;
+//Gramatika
+Program ::= MAIN LEFTPAR RIGHTPAR Block
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :}
+            |MAIN LEFTPAR RIGHTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Telo bloka je nekorektno ");
+            	parser.errNo++;
+            :}
+            |MAIN LEFTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Nedostaje ')' posle ( ");
+            	parser.errNo++;
+            :} 
+            |MAIN error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Nedostaje '(' posle main ");
+            	parser.errNo++;
+            :} 
+            |error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Program pocinje sa main ");
+            	parser.errNo++;
+            :};
+            
+
+Block ::= LEFTBLOCK Variables Statements RIGHTBLOCK
+             {:
+                System.out.println( "Redukcija po smeni 2." );
+             :}
+          |LEFTBLOCK Variables Statements error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Fali '}' posle Statements.");
+            	parser.errNo++;
+            :} 
+          |LEFTBLOCK Variables error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Telo Statements je nekorektno.");
+            	parser.errNo++;
+            :} 
+          |LEFTBLOCK error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Telo Variables je nekorektno.");
+            	parser.errNo++;
+            :} ;
+
+Variables ::= Variables Variable 
+            {:
+               System.out.println( "Redukcija po smeni 3." );
+            :}
+          | Variable
+            {:
+               System.out.println( "Redukcija po smeni 4." );
+            :};
+
+Variable ::= Type ID SEMICOLON
+                {:
+                   System.out.println( "Redukcija po smeni 5." );
+                :}
+            | Type ID error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle deklaracije ide ';' .");
+            	parser.errNo++;
+            :}
+            | Type error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle tipa ide identifikator.");
+            	parser.errNo++;
+            :}
+            ;
+
+Type ::= INT 
+             {:
+                System.out.println( "Redukcija po smeni 6." );
+             :} 
+           | REAL
+             {:
+                System.out.println( "Redukcija po smeni 7." );
+             :}
+           | BOOLEAN
+             {:
+                System.out.println( "Redukcija po smeni 8." );
+             :}
+           ;
+
+Statements ::= Statements SEMICOLON Statement 
+        {:
+           System.out.println( "Redukcija po smeni 9." );
+        :}
+      | Statement
+        {:
+           System.out.println( "Redukcija po smeni 10." );
+        :}
+      | Statements SEMICOLON error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u statement.");
+            	parser.errNo++;
+      :}
+      ;
+
+Statement ::= Assignment
+         {:
+            System.out.println( "Redukcija po smeni 11." );
+         :}
+         | IfStatement
+        {:
+           System.out.println( "Redukcija po smeni 12." );
+        :}
+         ;
+
+IfStatement ::= IF LEFTPAR RelExpression RIGHTPAR COLON Block ElsePart
+           {:
+              System.out.println( "Redukcija po smeni 13." );
+           :}
+            | IF LEFTPAR RelExpression RIGHTPAR COLON Block error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u ElsePart kod IF.");
+            	parser.errNo++;
+            :}
+             | IF LEFTPAR RelExpression RIGHTPAR COLON error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u Bloku.");
+            	parser.errNo++;
+            :}
+             | IF LEFTPAR RelExpression RIGHTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Iza ) ide ':' .");
+            	parser.errNo++;
+            :}
+             | IF LEFTPAR RelExpression error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Iza RelExpressiona ide ')' .");
+            	parser.errNo++;
+            :}
+             | IF LEFTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u RelExpression.");
+            	parser.errNo++;
+            :}
+            | IF error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"IF pocinje '(' .");
+            	parser.errNo++;
+            :}
+            
+           ;
+
+ElsePart ::= ElifList ElseStatement
+            {:
+               System.out.println( "Redukcija po smeni 14." );
+            :}
+          | ElifList 
+            {:
+               System.out.println( "Redukcija po smeni 15." );
+            :}
+          | ElseStatement
+            {:
+               System.out.println( "Redukcija po smeni 16." );
+            :}
+          | 
+            {:
+               System.out.println( "Redukcija po smeni E." );
+            :}
+          ;
+
+ElifList ::= ElifList Elif
+         {:
+            System.out.println( "Redukcija po smeni 17." );
+         :}
+         | Elif
+            {:
+               System.out.println( "Redukcija po smeni 18." );
+            :}
+          
+          ;
+
+Elif ::= ELIF LEFTPAR RelExpression RIGHTPAR COLON Block
+          {:
+             System.out.println( "Redukcija po smeni 19." );
+          :}
+          | ELIF LEFTPAR RelExpression RIGHTPAR COLON error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u elif bloku.");
+            	parser.errNo++;
+            :}
+            | ELIF LEFTPAR RelExpression RIGHTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle ) ide ':' .");
+            	parser.errNo++;
+            :}
+            |ELIF LEFTPAR RelExpression error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle RealExpression ide ')' .");
+            	parser.errNo++;
+            :}
+            | ELIF LEFTPAR error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle ( ide RealExpression .");
+            	parser.errNo++;
+            :}
+            | ELIF error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle elif ide '(' .");
+            	parser.errNo++;
+            :}
+          ;
+
+ElseStatement ::= ELSE COLON Block 
+           {:
+              System.out.println( "Redukcija po smeni 20." );
+           :}
+           | ELSE COLON error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u else bloku.");
+            	parser.errNo++;
+            :}
+            | ELSE error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle else ide ':' .");
+            	parser.errNo++;
+            :};
+
+RelExpression ::= Term RelOp Term 
+          {:
+             System.out.println( "Redukcija po smeni 21." );
+          :}
+        | Term
+          {:
+             System.out.println( "Redukcija po smeni 22." );
+          :}
+          | Term RelOp error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle RelOp ide Term.");
+            	parser.errNo++;
+            :}
+        ;
+
+Term ::= ID
+           {:
+              System.out.println( "Redukcija po smeni 23." );
+           :}
+         | CONST
+           {:
+              System.out.println( "Redukcija po smeni 24." );
+           :}
+         ;
+
+RelOp ::= LESSTHAN
+           {:
+              System.out.println( "Redukcija po smeni 25." );
+           :}
+         | LESSOREQUAL
+           {:
+              System.out.println( "Redukcija po smeni 26." );
+           :}
+         | GREATERTHAN
+           {:
+              System.out.println( "Redukcija po smeni 27." );
+           :}
+         | GREATEROREQUAL
+           {:
+              System.out.println( "Redukcija po smeni 28." );
+           :}
+         | EQUAL
+           {:
+              System.out.println( "Redukcija po smeni 29." );
+           :}
+         | NOTEQUAL
+           {:
+              System.out.println( "Redukcija po smeni 30." );
+           :}
+         | error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Greska u RelExpression operatoru.");
+            	parser.errNo++;
+            :}
+          
+         ;
+
+Assignment ::= ID ASSIGN Term
+          {:
+             System.out.println( "Redukcija po smeni 31." );
+          :}
+          | ID ASSIGN error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Identifikatoru se dodeljuje term.");
+            	parser.errNo++;
+            :}
+            | ID error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " + 
+            		"Posle identifikatora ide ':=' .");
+            	parser.errNo++;
+            :};
+
+
+
+
+
+	
+

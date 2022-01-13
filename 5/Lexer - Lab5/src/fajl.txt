@@ -1,0 +1,24 @@
+ConstantExpression
+
+    Load_Const R1, CONST
+    
+VariableExpression
+
+    Load_Mem R1, ID
+    
+LessRelExp      	-   relOp = Compare_less
+EqualRelExp     	-   relOp = Compare_equal
+GreaterRelExp   	-   relOp = Compare_greater
+LessOrEqualRelExp   - 	relOp = Comparre_lessOrEqual
+GreaterOrEqualRelExp - relOp = Compare_greaterOrEqual
+NotEqualRealExp		- relOp = Compare_notEqual
+RelExpression
+
+    IMC<Left>
+    Load_Mem R2, leftMem
+    IMC<Rigth>
+    Load_Mem R1, rigthMem
+    relOp R1, R2
+    Store R1, result
+    // else
+    Store R2, result

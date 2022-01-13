@@ -1,0 +1,22 @@
+	Load_Const	R1, 157
+	Store		R1, a
+	Load_Const	R1, true
+	Store		R1, b
+	Load_Const	R1, 5.987
+	Store		R1, c
+	Load_Mem		R2, c
+	Store		R2, $tmp0
+	Load_Mem		R1, $tmp0
+	JumpIfZero	R1, lab0
+	Load_Const	R1, 1
+	Store		R1, j
+	Jump	lab1
+lab0:
+	Load_Mem		R2, b
+	Store		R2, $tmp1
+	Load_Mem		R1, $tmp1
+	JumpIfZero	R1, lab2
+	Load_Const	R1, true
+	Store		R1, h
+	Jump	lab3
+lab2:lab1:

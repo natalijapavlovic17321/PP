@@ -1,0 +1,303 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+import SymbolTable.*;
+import AST.*;
+import java.util.ArrayList;
+import java_cup.runtime.Scanner;
+
+parser code {:
+
+   public int errNo = 0;
+   public int warnNo = 0;
+   
+   SymbolTable symbolTable;
+   
+   public static void main( String[] args )
+   {
+      try
+	  {
+		   FileReader file = new FileReader( args[0] );
+		   Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+		   parser.checkWarnings();
+		   if ( parser.errNo == 0 && parser.warnNo == 0 )
+		      System.out.println( "Analiza zavrsena. U kodu nema gresaka." );
+		   else
+		      System.out.println( "Analiza zavrsena. Broj gresaka: " + parser.errNo 
+		         + " Broj upozorenja: " + parser.warnNo );
+	  }
+	  catch( Exception e )
+	  {
+		   System.out.println(e);
+	  }
+   }
+   
+   public void checkWarnings()
+   {
+      SymbolNode current = symbolTable.getVariables();
+      while ( current != null )
+      {
+      	Variable var = ( Variable ) current;
+      	if ( var.last_def != -1 && var.last_use == -1 )
+      	{
+      		System.out.println( "Upozorenje: Promenljiva " + var.name + 
+      			" je deklarisana, ali se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	else if ( var.last_def > var.last_use )
+      	{
+      		System.out.println( "Upozorenje: Vrednost dodeljena promeljivoj " +
+      		    var.name + " u liniji " + var.last_def + " se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	current = current.next;
+     }
+   }
+   
+   public void syntax_error(Symbol cur_token)
+   {
+   	  
+   }
+   
+   public void report_error(String message, Object info)
+   {
+   	   System.out.print( message );
+   }
+   
+   public int getLine()
+   {
+   	  return (( MPLexer) getScanner()).getLine();
+   }
+:};
+
+init with{:
+	symbolTable=new SymbolTable();
+:}
+
+
+//Terminali
+terminal MAIN, INT, BOOLEAN, REAL, IF, ELIF, ELSE;
+terminal LEFTBLOCK, RIGHTBLOCK, LEFTPAR, RIGHTPAR, LESSTHAN, LESSOREQUAL, GREATERTHAN, GREATEROREQUAL, EQUAL, NOTEQUAL, SEMICOLON, COLON, ASSIGN;
+terminal String ID;
+terminal Integer INTCONST;
+terminal Double REALCONST;
+terminal Boolean BOOLEANCONST;
+
+//Neterminali
+non terminal Block Program, Blok, ElseStatement;
+non terminal Variables, Variable;
+non terminal IfStatement  IfStatements,Elif;
+non terminal Statement Statemnt;
+non terminal ElsePart ElsePart;
+non terminal Assignment Asignment;
+non terminal Constant  Konstanta;
+non terminal Type Tip;
+non terminal Term Term;
+non terminal RealExpression RelExpression;
+non terminal String RelOp;
+non terminal ArrayList Statements, ElifList;
+
+start with Program;
+//Gramatika
+Program ::= MAIN LEFTPAR RIGHTPAR Blok:b
+            {:
+				RESULT=b;
+            :};
+
+Blok ::= LEFTBLOCK Variables Statements:s RIGHTBLOCK
+             {:
+                RESULT = new Block(s);
+             :};
+
+Variables ::= Variables Variable 
+          | Variable
+          ;
+
+Variable ::= Tip:tip ID:ime SEMICOLON
+                {:
+                   if ( ! parser.symbolTable.addVar( ime, tip) )
+					   {
+					   	 System.out.println( "Greska u liniji " + parser.getLine() + ": " + 
+                   			"Promenljiva " + ime + " je vec deklarisana." );
+            		     parser.errNo++;
+					   }
+                :};
+
+Tip ::= INT 
+             {:
+                RESULT = parser.symbolTable.getType( "int" );
+             :} 
+           | REAL
+             {:
+                RESULT = parser.symbolTable.getType( "real" );
+             :}
+           | BOOLEAN
+             {:
+                RESULT = parser.symbolTable.getType( "boolean" );
+             :}
+           ;
+
+Statements ::= Statements:ss SEMICOLON Statemnt:s 
+        {:
+           	ss.add(s);
+            RESULT = ss;
+        :}
+      | Statemnt:s
+        {:
+            RESULT = new ArrayList<Statement>();
+            RESULT.add(s);
+        :}
+      ;
+
+Statemnt ::= Asignment:a
+         {:
+            RESULT=a;
+         :}
+         | IfStatements:i
+        {:
+           RESULT=i;
+        :}
+         ;
+
+IfStatements ::= IF LEFTPAR RelExpression:i RIGHTPAR COLON Blok:n1 ElsePart:n2
+           {:
+				RESULT = new IfStatement( i, n1, n2 );
+           :};
+
+ElsePart ::= ElifList:ee ElseStatement:e
+            {:
+               RESULT = new ElsePart(ee,e);
+            :}
+          | ElifList:ee 
+            {:
+               RESULT= new ElsePart(ee,null);
+            :}
+          | ElseStatement:e
+            {:
+               RESULT= new ElsePart(null,e);
+            :}
+          | 
+          ;
+
+ElifList ::= ElifList:ee Elif:e
+         {:
+            ee.add(e);
+            RESULT = ee;
+         :}
+         | Elif:e
+            {:
+               RESULT = new ArrayList<IfStatement>();
+               RESULT.add(e);
+            :}
+          ;
+
+Elif ::= ELIF LEFTPAR RelExpression:i RIGHTPAR COLON Blok:n1
+          {:
+             RESULT = new IfStatement( i, n1, null );
+          :};
+
+ElseStatement ::= ELSE COLON Blok:b 
+           {:
+              RESULT=b;
+           :};
+
+RelExpression ::= Term:t1 RelOp:op Term:t2 
+          {:
+             if(op == "less")
+                RESULT = new LessRelExp(t1, t2);
+            else if(op == "equal")
+                RESULT = new EqualRelExp(t1, t2);
+            else if (op == "greater")
+                RESULT = new GreaterRelExp(t1, t2);
+			else if(op=="lessOrEqual")
+				RESULT=new LessOrEqualRelExp(t1,t2);
+			else if(op=="greaterOrEqual")
+				RESULT=new GreaterOrEqualRelExp(t1,t2);
+			else if(op=="notEqual")
+				RESULT=new NotEqualRelExp(t1,t2);
+          :}
+        | Term:t
+          {:
+             RESULT = new RealExpression(t);
+          :}
+        ;
+
+Term ::= ID:ime
+           {:
+			   Variable var = parser.symbolTable.getVar( ime );
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+			  {
+		      	RESULT = new VariableExpression( var );
+				 var.last_use= parser.getLine();
+			    }
+           :}
+         | Konstanta:k
+           {:
+				RESULT = new ConstantExpression( k );
+           :}
+         ;
+Konstanta ::= INTCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "int" ), c );
+              :}
+            | REALCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "real" ), c );
+              :}
+            | BOOLEANCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "boolean" ), c );
+              :}
+            ;
+
+RelOp ::= LESSTHAN
+           {:
+				RESULT="less";
+           :}
+         | LESSOREQUAL
+           {:
+				RESULT="lessOrEqual";
+           :}
+         | GREATERTHAN
+           {:
+				RESULT="greater";
+           :}
+         | GREATEROREQUAL
+           {:
+				RESULT="greaterOrEqual";
+           :}
+         | EQUAL
+           {:
+				RESULT="equal";
+           :}
+         | NOTEQUAL
+           {:
+			  RESULT="notEqual";
+           :}
+         ;
+
+Asignment ::= ID:ime ASSIGN Term:i
+          {:
+				Variable var = parser.symbolTable.getVar( ime);
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() + 
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else RESULT = new Assignment( var, i );
+          :};
+
+
+	
+
